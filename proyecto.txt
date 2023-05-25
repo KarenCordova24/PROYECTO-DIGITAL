@@ -1,0 +1,20 @@
+Servo pulgar;
+Servo extra;
+Servo indice;
+Servo medio;
+Servo anular;
+Servo menique;
+
+int potPinPulgar = A0;   // Pin analógico para el potenciómetro del pulgar
+int potPinExtra = A1;    // Pin analógico para el potenciómetro del dedo extra
+int potPinIndice = A2;   // Pin analógico para el potenciómetro del dedo índice
+int potPinMedio = A3;    // Pin analógico para el potenciómetro del dedo medio
+int potPinAnular = A4;   // Pin analógico para el potenciómetro del dedo anular
+int potPinMenique = A5;  // Pin analógico para el potenciómetro del dedo meñique
+
+int posPulgar = 0;
+int posExtra = 0;
+int posIndice = 0;
+int posMedio = 0;
+int posAnular = 0;
+int posMenique = 0;
