@@ -18,3 +18,36 @@ int posIndice = 0;
 int posMedio = 0;
 int posAnular = 0;
 int posMenique = 0;
+
+void setup()
+{
+  Serial.begin(9600);
+
+  pulgar.attach(7);
+  extra.attach(8);
+  indice.attach(9);
+  medio.attach(10);
+  anular.attach(11);
+  menique.attach(12);
+}
+
+void loop()
+{
+  // Lectura de los valores de los potenciómetros
+  posPulgar = map(analogRead(potPinPulgar), 0, 1023, 50, 170);
+  posExtra = map(analogRead(potPinExtra), 0, 1023, 10, 150);
+  posIndice = map(analogRead(potPinIndice), 0, 1023, 10, 150);
+  posMedio = map(analogRead(potPinMedio), 0, 1023, 10, 150);
+  posAnular = map(analogRead(potPinAnular), 0, 1023, 10, 150);
+  posMenique = map(analogRead(potPinMenique), 0, 1023, 100, 150);
+
+  // Movimiento de los servos según los valores de los potenciómetros
+  pulgar.write(posPulgar);
+  extra.write(posExtra);
+  indice.write(posIndice);
+  medio.write(posMedio);
+  anular.write(posAnular);
+  menique.write(posMenique);
+
+  delay(10);
+}
