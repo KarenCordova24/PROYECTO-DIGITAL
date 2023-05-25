@@ -1,0 +1,11 @@
+void setup()
+{
+  Serial.begin(9600);
+
+  pulgar.attach(7);
+  extra.attach(8);
+  indice.attach(9);
+  medio.attach(10);
+  anular.attach(11);
+  menique.attach(12);
+}
