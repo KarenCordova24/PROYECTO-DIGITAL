@@ -1,3 +1,7 @@
+#include <Servo.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
 Servo pulgar;
 Servo extra;
 Servo indice;
@@ -5,12 +9,12 @@ Servo medio;
 Servo anular;
 Servo menique;
 
-int potPinPulgar = A0;   // Pin analógico para el potenciómetro del pulgar
-int potPinExtra = A1;    // Pin analógico para el potenciómetro del dedo extra
-int potPinIndice = A2;   // Pin analógico para el potenciómetro del dedo índice
-int potPinMedio = A3;    // Pin analógico para el potenciómetro del dedo medio
-int potPinAnular = A4;   // Pin analógico para el potenciómetro del dedo anular
-int potPinMenique = A5;  // Pin analógico para el potenciómetro del dedo meñique
+int potPinPulgar = A0;    // Pin analógico para el potenciómetro del pulgar
+int potPinExtra = A1;     // Pin analógico para el potenciómetro del dedo extra
+int potPinIndice = A2;    // Pin analógico para el potenciómetro del dedo índice
+int potPinMedio = A3;     // Pin analógico para el potenciómetro del dedo medio
+int potPinAnular = 6;     // Pin digital para el potenciómetro del dedo anular
+int potPinMenique = 5;    // Pin digital para el potenciómetro del dedo meñique
 
 int posPulgar = 0;
 int posExtra = 0;
@@ -18,6 +22,15 @@ int posIndice = 0;
 int posMedio = 0;
 int posAnular = 0;
 int posMenique = 0;
+
+int lastPosPulgar = 0;
+int lastPosExtra = 0;
+int lastPosIndice = 0;
+int lastPosMedio = 0;
+int lastPosAnular = 0;
+int lastPosMenique = 0;
+
+LiquidCrystal_I2C lcd(32, 16, 2);  // Dirección del display LCD y dimensiones
 
 void setup()
 {
@@ -29,6 +42,14 @@ void setup()
   medio.attach(10);
   anular.attach(11);
   menique.attach(12);
+
+  lcd.init();  // Inicializar el display LCD
+  lcd.backlight();  // Encender la retroiluminación del display
+  lcd.setCursor(0, 0);
+  lcd.print("Calibrando...");
+
+  calibrateServos();
+  lcd.clear();
 }
 
 void loop()
@@ -39,15 +60,86 @@ void loop()
   posIndice = map(analogRead(potPinIndice), 0, 1023, 10, 150);
   posMedio = map(analogRead(potPinMedio), 0, 1023, 10, 150);
   posAnular = map(analogRead(potPinAnular), 0, 1023, 10, 150);
-  posMenique = map(analogRead(potPinMenique), 0, 1023, 100, 150);
+  posMenique = map(analogRead(potPinMenique), 0, 1023, 10, 150);
 
-  // Movimiento de los servos según los valores de los potenciómetros
-  pulgar.write(posPulgar);
-  extra.write(posExtra);
-  indice.write(posIndice);
-  medio.write(posMedio);
-  anular.write(posAnular);
-  menique.write(posMenique);
+  // Mover los servos solo si los valores han cambiado
+  if (posPulgar != lastPosPulgar) {
+    pulgar.write(posPulgar);
+    lastPosPulgar = posPulgar;
+    printCalibration("Pulgar", posPulgar);
+  }
+
+  if (posExtra != lastPosExtra) {
+    extra.write(posExtra);
+    lastPosExtra = posExtra;
+    printCalibration("Extra", posExtra);
+  }
+
+  if (posIndice != lastPosIndice) {
+    indice.write(posIndice);
+    lastPosIndice = posIndice;
+    printCalibration("Indice", posIndice);
+  }
+
+  if (posMedio != lastPosMedio) {
+    medio.write(posMedio);
+    lastPosMedio = posMedio;
+    printCalibration("Medio", posMedio);
+  }
+
+  if (posAnular != lastPosAnular) {
+    anular.write(posAnular);
+    lastPosAnular = posAnular;
+    printCalibration("Anular", posAnular);
+  }
+
+  if (posMenique != lastPosMenique) {
+    menique.write(posMenique);
+    lastPosMenique = posMenique;
+    printCalibration("Menique", posMenique);
+  }
 
   delay(10);
 }
+
+void calibrateServos()
+{
+  pulgar.write(0);
+  extra.write(0);
+  indice.write(0);
+  medio.write(0);
+  anular.write(0);
+  menique.write(0);
+  delay(500);
+
+  pulgar.write(180);
+  extra.write(180);
+  indice.write(180);
+  medio.write(180);
+  anular.write(180);
+  menique.write(180);
+  delay(500);
+
+  pulgar.write(90);
+  extra.write(90);
+  indice.write(90);
+  medio.write(90);
+  anular.write(90);
+  menique.write(90);
+  delay(500);
+}
+
+void printCalibration(const char* finger, int angle)
+{
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print(finger);
+  lcd.setCursor(0, 1);
+  lcd.print("Calibracion: ");
+  lcd.print(angle);
+  delay(1000);
+}
+
+
+
+
