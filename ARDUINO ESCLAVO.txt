@@ -1,0 +1,59 @@
+//Arduino Esclavo/Receiver
+
+#include <Servo.h>
+
+Servo servo1;
+Servo servo2;
+Servo servo3;
+Servo servo4;
+Servo servo5;
+Servo servo6;
+
+void setup() {
+  Serial.begin(9600);
+
+  servo1.attach(8);
+  servo2.attach(9);
+  servo3.attach(10);
+  servo4.attach(11);
+  servo5.attach(12);
+  servo6.attach(13);
+
+  // Configurar registros de puertos
+  DDRB = DDRB | B00111111; // Configurar pines 8 a 13 como salida
+}
+
+void loop() {
+  if (Serial.available() >= 6) {
+    byte angulo1 = Serial.read();
+    byte angulo2 = Serial.read();
+    byte angulo3 = Serial.read();
+    byte angulo4 = Serial.read();
+    byte angulo5 = Serial.read();
+    byte angulo6 = Serial.read();
+
+    if (angulo1 <= 180) {
+      servo1.write(angulo1);
+    }
+
+    if (angulo2 <= 180) {
+      servo2.write(angulo2);
+    }
+
+    if (angulo3 <= 180) {
+      servo3.write(angulo3);
+    }
+
+    if (angulo4 <= 180) {
+      servo4.write(angulo4);
+    }
+
+    if (angulo5 <= 180) {
+      servo5.write(angulo5);
+    }
+
+    if (angulo6 <= 180) {
+      servo6.write(angulo6);
+    }
+  }
+}
