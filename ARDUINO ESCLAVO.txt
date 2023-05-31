@@ -1,59 +1,39 @@
 //Arduino Esclavo/Receiver
 
+#include <avr/io.h>
+#include <util/delay.h>
 #include <Servo.h>
+#include <avr/eeprom.h>
 
-Servo servo1;
-Servo servo2;
-Servo servo3;
-Servo servo4;
-Servo servo5;
-Servo servo6;
+#define NUM_SERVOS 6
+
+Servo servo[NUM_SERVOS];
+uint8_t servoPin[NUM_SERVOS] = {8, 9, 10, 11, 12, 13};
 
 void setup() {
   Serial.begin(9600);
 
-  servo1.attach(8);
-  servo2.attach(9);
-  servo3.attach(10);
-  servo4.attach(11);
-  servo5.attach(12);
-  servo6.attach(13);
-
-  // Configurar registros de puertos
-  DDRB = DDRB | B00111111; // Configurar pines 8 a 13 como salida
+  for (uint8_t i = 0; i < NUM_SERVOS; i++) {
+    servo[i].attach(servoPin[i]);
+  }
 }
 
 void loop() {
-  if (Serial.available() >= 6) {
-    byte angulo1 = Serial.read();
-    byte angulo2 = Serial.read();
-    byte angulo3 = Serial.read();
-    byte angulo4 = Serial.read();
-    byte angulo5 = Serial.read();
-    byte angulo6 = Serial.read();
-
-    if (angulo1 <= 180) {
-      servo1.write(angulo1);
+  if (Serial.available() >= NUM_SERVOS) {
+    for (uint8_t i = 0; i < NUM_SERVOS; i++) {
+      uint8_t pos = Serial.read();
+      servo[i].write(pos);
     }
+  }
+  
+  // Delay to allow time for the servos to move
+  _delay_ms(50);
+}
 
-    if (angulo2 <= 180) {
-      servo2.write(angulo2);
-    }
-
-    if (angulo3 <= 180) {
-      servo3.write(angulo3);
-    }
-
-    if (angulo4 <= 180) {
-      servo4.write(angulo4);
-    }
-
-    if (angulo5 <= 180) {
-      servo5.write(angulo5);
-    }
-
-    if (angulo6 <= 180) {
-      servo6.write(angulo6);
-    }
+// Replay function to move servos based on recorded positions
+void replayMovement() {
+  for (uint8_t i = 0; i < NUM_SERVOS; i++) {
+    uint8_t pos = eeprom_read_byte((uint8_t*)i);
+    servo[i].write(pos);
   }
 }
