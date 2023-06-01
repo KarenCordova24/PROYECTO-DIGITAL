@@ -34,3 +34,107 @@ void setup() {
   attachInterrupt(0, Boton, RISING);
   attachInterrupt(1, Boton1, RISING);
 
+  // Set up Timer 0 for LED control
+  TCCR0A = 0;                   // Set timer control registers to 0
+  TCCR0B = 0;
+  TCNT0 = 0;                    // Initialize the counter value
+  OCR0A = 195;                  // Set the compare match value (adjust as needed for desired LED blink rate)
+  TIMSK0 |= (1 << OCIE0A);      // Enable Timer 0 compare match interrupt
+  TCCR0B |= (1 << CS02) | (1 << CS00);  // Set the prescaler to 1024 and start the timer
+
+  // Enable global interrupts
+  sei();
+
+  // Leer las posiciones guardadas en la EEPROM
+  for (uint8_t i = 0; i < NUM_SERVOS; i++) {
+    servoPos[i] = eeprom_read_byte((uint8_t*)(i * sizeof(uint8_t)));  // Use sizeof(uint8_t) to ensure correct address increment
+    Serial.print("Servo ");
+    Serial.print(i);
+    Serial.print(" - Posición guardada: ");
+    Serial.println(servoPos[i]);
+  }
+}
+
+void loop() {
+ 
+  if (estado_boton==0){
+    digitalWrite(ledPin,HIGH);
+    for (uint8_t i = 0; i < NUM_SERVOS; i++) {
+    	servoPosEnviar[i]=servoPos[i];
+    }
+  }
+  if (estado_boton==1){
+    digitalWrite(ledPin,LOW);
+    for (uint8_t i = 0; i < NUM_SERVOS; i++) {
+      servoPosEnviar[i]=anguloMin[i];
+    }
+    estado_boton=2;
+    guardarPosiciones = true;
+  }
+  
+  // Lectura de las posiciones de los potenciómetros
+  for (uint8_t i = 0; i < NUM_SERVOS; i++) {
+    uint16_t lectura = analogRead(potPin[i]);
+    uint8_t pos = map(lectura, 0, 1023, anguloMin[i], anguloMax[i]);
+    servoPos[i] = pos;
+  }
+/*
+  // Botón para guardar las posiciones en la EEPROM
+  uint8_t botonEstado = PIND & (1 << botonPin);
+  if (botonEstado == 0 && botonEstadoAnterior != 0) {
+    guardarPosiciones = true;
+  }
+  botonEstadoAnterior = botonEstado;
+*/
+  // Guardar las posiciones en la EEPROM
+  if (guardarPosiciones) {
+    for (uint8_t i = 0; i < NUM_SERVOS; i++) {
+    	servoPosGuardar[i]=servoPos[i];
+    }
+    for (uint8_t i = 0; i < NUM_SERVOS; i++) {
+      eeprom_update_byte((uint8_t*)(i * sizeof(uint8_t)), servoPos[i]);  // Use sizeof(uint8_t) to ensure correct address increment
+      _delay_ms(10);
+    }
+    Serial.println("Posiciones guardadas en EEPROM");
+    guardarPosiciones = false;
+    //digitalWrite(ledPin,LOW);
+    eepromRecorded = true;  // Set the EEPROM recorded flag
+  }
+
+  // Enviar las posiciones de los servos por el puerto serial
+  for (uint8_t i = 0; i < NUM_SERVOS; i++) {
+    
+    Serial.write(servoPosEnviar[i]);
+  }
+  digitalWrite(ledPin1,LOW);
+  _delay_ms(50);
+}
+
+// Timer 0 compare match interrupt handler
+ISR(TIMER0_COMPA_vect) {
+  if (eepromRecorded) {
+    //digitalWrite(ledPin, HIGH);  // Turn on the LED
+    eepromRecorded = false;      // Reset the EEPROM recorded flag
+  } else {
+    //digitalWrite(ledPin, LOW);   // Turn off the LED
+  }
+}
+
+void Boton (){
+  if(estado_boton>1){
+    estado_boton=0;
+  }
+  else{
+    estado_boton=estado_boton+1;
+  }
+  
+  //digitalWrite(ledPin,HIGH);
+}
+
+void Boton1 (){
+  digitalWrite(ledPin1,HIGH);
+  for (uint8_t i = 0; i < NUM_SERVOS; i++) {
+    servoPosEnviar[i] = eeprom_read_byte((uint8_t*)(i * sizeof(uint8_t))); 
+  }
+}
+
