@@ -1,23 +1,36 @@
-//Arduino Maestro/Transmitter
+// Arduino Maestro/Transmitter
+
+#include <avr/io.h>
+#include <util/delay.h>
+#include <avr/eeprom.h>
+#include <avr/interrupt.h>
+
+#define NUM_SERVOS 6
+
+uint8_t servoPos[NUM_SERVOS];
+uint8_t servoPosEnviar[NUM_SERVOS];
+uint8_t servoPosGuardar[NUM_SERVOS];
+uint8_t potPin[NUM_SERVOS] = {A0, A1, A2, A3, A4, A5};  // Use A0, A1, ... for analog input pins
+uint8_t botonPin = 2;
+uint8_t botonPin1 = 3;
+uint8_t botonEstadoAnterior = 1;
+uint8_t estado_boton=2;
+bool guardarPosiciones = false;
+volatile bool eepromRecorded = false;  // Volatile flag to indicate EEPROM recording
+const uint8_t ledPin = 13;    // Pin for the LED
+const uint8_t ledPin1 = 4;
+
+// Ángulos límites para cada servo
+uint8_t anguloMin[NUM_SERVOS] = {50, 10, 10, 10, 10, 10};    // Ángulo mínimo permitido
+uint8_t anguloMax[NUM_SERVOS] = {170, 150, 150, 150, 150, 150};    // Ángulo máximo permitido
 
 void setup() {
   Serial.begin(9600);
-}
+  DDRD &= ~(1 << botonPin);  // Configurar el pin del botón como entrada
+  PORTD |= (1 << botonPin);  // Habilitar resistencia pull-up interna en el pin del botón
+  pinMode(ledPin, OUTPUT);   // Set the LED pin as output
+  pinMode(ledPin1, OUTPUT);   // Set the LED pin as output
+  pinMode(botonPin,INPUT_PULLUP);
+  attachInterrupt(0, Boton, RISING);
+  attachInterrupt(1, Boton1, RISING);
 
-void loop() {
-  int lectura1 = analogRead(A0);
-  int lectura2 = analogRead(A1);
-  int lectura3 = analogRead(A2);
-  int lectura4 = analogRead(A3);
-  int lectura5 = analogRead(A4);
-  int lectura6 = analogRead(A5);
-
-  Serial.write(angulo1);
-  Serial.write(angulo2);
-  Serial.write(angulo3);
-  Serial.write(angulo4);
-  Serial.write(angulo5);
-  Serial.write(angulo6);
-
-  delay(50);
-}
