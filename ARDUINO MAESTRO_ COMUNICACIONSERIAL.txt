@@ -6,3 +6,21 @@ void setup() {
   ADCSRA |= (1 << ADEN); // Habilitar ADC
   ADMUX = (1 << REFS0); // Seleccionar referencia de voltaje de 5V
 }
+
+void loop() {
+  // Leer los valores de los potenciómetros utilizando ADC
+  int lecturaPulgar = leerPotenciometro(A0);
+  int lecturaExtra = leerPotenciometro(A1);
+  int lecturaIndice = leerPotenciometro(A2);
+  int lecturaMedio = leerPotenciometro(A3);
+  int lecturaAnular = leerPotenciometro(A4);
+  int lecturaMenique = leerPotenciometro(A5);
+
+// Mapear los valores de los potenciómetros a los ángulos de los servos
+  int posPulgar = map(lecturaPulgar, 0, 1023, 50, 170);
+  int posExtra = map(lecturaExtra, 0, 1023, 10, 150);
+  int posIndice = map(lecturaIndice, 0, 1023, 10, 150);
+  int posMedio = map(lecturaMedio, 0, 1023, 10, 150);
+  int posAnular = map(lecturaAnular, 0, 1023, 10, 150);
+  int posMenique = map(lecturaMenique, 0, 1023, 10, 150);
+
