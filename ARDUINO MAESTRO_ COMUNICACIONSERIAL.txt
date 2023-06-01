@@ -35,3 +35,18 @@ void loop() {
   delay(50);
 }
 
+int leerPotenciometro(int pin) {
+  // Seleccionar el pin analógico
+  ADMUX = (ADMUX & 0xF0) | (pin & 0x0F);
+
+  // Iniciar la conversión
+  ADCSRA |= (1 << ADSC);
+
+  // Esperar a que la conversión termine
+  while (ADCSRA & (1 << ADSC)) {}
+
+  // Obtener el resultado de la conversión
+  int valor = ADC;
+
+  return valor;
+}
