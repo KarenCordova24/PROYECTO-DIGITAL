@@ -24,3 +24,14 @@ void loop() {
   int posAnular = map(lecturaAnular, 0, 1023, 10, 150);
   int posMenique = map(lecturaMenique, 0, 1023, 10, 150);
 
+// Enviar los valores de posición a través del puerto serie
+  Serial.write(posPulgar);
+  Serial.write(posExtra);
+  Serial.write(posIndice);
+  Serial.write(posMedio);
+  Serial.write(posAnular);
+  Serial.write(posMenique);
+
+  delay(50);
+}
+
