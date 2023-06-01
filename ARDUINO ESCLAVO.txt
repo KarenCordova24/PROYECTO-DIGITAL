@@ -1,17 +1,27 @@
-//Arduino Esclavo/Receiver
+// Arduino Esclavo/Receiver
 
-#include <avr/io.h>
-#include <util/delay.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
 #include <Servo.h>
-#include <avr/eeprom.h>
 
 #define NUM_SERVOS 6
 
 Servo servo[NUM_SERVOS];
 uint8_t servoPin[NUM_SERVOS] = {8, 9, 10, 11, 12, 13};
 
+LiquidCrystal_I2C lcd(32,16, 2);  // Set the LCD I2C address and dimensions
+
 void setup() {
   Serial.begin(9600);
+  lcd.init();  // Initialize the LCD
+  lcd.backlight();  // Turn on the backlight
+  lcd.setCursor(0, 0);
+  lcd.print("MANO ROBOTICA");
+  delay(500);
+  lcd.setCursor(0, 0);
+  lcd.print("Calibrando...");
+  delay(300);
+  lcd.clear();
 
   for (uint8_t i = 0; i < NUM_SERVOS; i++) {
     servo[i].attach(servoPin[i]);
@@ -20,9 +30,19 @@ void setup() {
 
 void loop() {
   if (Serial.available() >= NUM_SERVOS) {
+    lcd.clear();  // Clear the LCD display
+    lcd.setCursor(0, 0);  // Set the cursor to the first position
+    
     for (uint8_t i = 0; i < NUM_SERVOS; i++) {
       uint8_t pos = Serial.read();
       servo[i].write(pos);
+      
+      // Display servo positions on the LCD
+      lcd.print(" Servo ");
+      lcd.print(i);
+      lcd.print(": ");
+      lcd.print(pos);
+      lcd.print("   ");
     }
   }
   
@@ -30,10 +50,3 @@ void loop() {
   _delay_ms(50);
 }
 
-// Replay function to move servos based on recorded positions
-void replayMovement() {
-  for (uint8_t i = 0; i < NUM_SERVOS; i++) {
-    uint8_t pos = eeprom_read_byte((uint8_t*)i);
-    servo[i].write(pos);
-  }
-}
