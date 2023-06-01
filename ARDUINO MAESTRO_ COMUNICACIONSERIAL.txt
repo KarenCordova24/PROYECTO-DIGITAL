@@ -2,4 +2,7 @@
 
 void setup() {
   Serial.begin(9600);
-  
+ // Configurar los pines A0-A5 como entradas analógicas
+  ADCSRA |= (1 << ADEN); // Habilitar ADC
+  ADMUX = (1 << REFS0); // Seleccionar referencia de voltaje de 5V
+}
