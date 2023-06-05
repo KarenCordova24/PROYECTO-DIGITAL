@@ -4,6 +4,7 @@
 #include <util/delay.h>
 #include <avr/eeprom.h>
 #include <avr/interrupt.h>
+#include <Servo.h>
 
 #define NUM_SERVOS 6
 
@@ -11,14 +12,14 @@ uint8_t servoPos[NUM_SERVOS];
 uint8_t servoPosEnviar[NUM_SERVOS];
 uint8_t servoPosGuardar[NUM_SERVOS];
 uint8_t potPin[NUM_SERVOS] = {A0, A1, A2, A3, A4, A5};  // Use A0, A1, ... for analog input pins
-uint8_t botonPin = 2;
-uint8_t botonPin1 = 3;
+uint8_t B = 2;
+uint8_t botonPin = 3; // Define the button pin number
 uint8_t botonEstadoAnterior = 1;
-uint8_t estado_boton=2;
+uint8_t estado_boton = 2;
 bool guardarPosiciones = false;
 volatile bool eepromRecorded = false;  // Volatile flag to indicate EEPROM recording
-const uint8_t ledPin = 13;    // Pin for the LED
-const uint8_t ledPin1 = 4;
+const uint8_t L = 13;    // Pin for the LED
+const uint8_t L1 = 4;
 
 // Ángulos límites para cada servo
 uint8_t anguloMin[NUM_SERVOS] = {50, 10, 10, 10, 10, 10};    // Ángulo mínimo permitido
@@ -26,23 +27,23 @@ uint8_t anguloMax[NUM_SERVOS] = {170, 150, 150, 150, 150, 150};    // Ángulo m�
 
 void setup() {
   Serial.begin(9600);
-  DDRD &= ~(1 << botonPin);  // Configurar el pin del botón como entrada
-  PORTD |= (1 << botonPin);  // Habilitar resistencia pull-up interna en el pin del botón
-  pinMode(ledPin, OUTPUT);   // Set the LED pin as output
-  pinMode(ledPin1, OUTPUT);   // Set the LED pin as output
-  pinMode(botonPin,INPUT_PULLUP);
+  DDRD &= ~(1 << B);  // Configurar el pin del botón como entrada
+  PORTD |= (1 << B);  // Habilitar resistencia pull-up interna en el pin del botón
+  pinMode(L, OUTPUT);   // Set the LED pin as output
+  pinMode(L1, OUTPUT);   // Set the LED pin as output
+  pinMode(botonPin, INPUT_PULLUP);
   attachInterrupt(0, Boton, RISING);
   attachInterrupt(1, Boton1, RISING);
 
-  // Set up Timer 0 for LED control
-  TCCR0A = 0;                   // Set timer control registers to 0
+  // Configurando el Timer 0 para el control LED TIEMPO REAL "Amarillo"
+  TCCR0A = 0;                   // Establecer los registros de control del temporizador en 0
   TCCR0B = 0;
-  TCNT0 = 0;                    // Initialize the counter value
-  OCR0A = 195;                  // Set the compare match value (adjust as needed for desired LED blink rate)
-  TIMSK0 |= (1 << OCIE0A);      // Enable Timer 0 compare match interrupt
-  TCCR0B |= (1 << CS02) | (1 << CS00);  // Set the prescaler to 1024 and start the timer
+  TCNT0 = 0;                    // Inicializando el valor del contador
+  OCR0A = 195;                  // Estableciendo el valor de coincidencia de comparación (Ajuste según sea necesario para la tasa de parpadeo deseado)
+  TIMSK0 |= (1 << OCIE0A);      // Habilitando Timer 0 comparando la interrupción de coincidencia
+  TCCR0B |= (1 << CS02) | (1 << CS00);  // Estableciendo el prescalador a 1024 e iniciando el temporizador
 
-  // Enable global interrupts
+  // Habilitando interrupciones globales
   sei();
 
   // Leer las posiciones guardadas en la EEPROM
@@ -56,40 +57,40 @@ void setup() {
 }
 
 void loop() {
- 
-  if (estado_boton==0){
-    digitalWrite(ledPin,HIGH);
+
+  if (estado_boton == 0) {
+    digitalWrite(L, HIGH);
     for (uint8_t i = 0; i < NUM_SERVOS; i++) {
-    	servoPosEnviar[i]=servoPos[i];
+      servoPosEnviar[i] = servoPos[i];
     }
   }
-  if (estado_boton==1){
-    digitalWrite(ledPin,LOW);
+  if (estado_boton == 1) {
+    digitalWrite(L, LOW);
     for (uint8_t i = 0; i < NUM_SERVOS; i++) {
-      servoPosEnviar[i]=anguloMin[i];
+      servoPosEnviar[i] = anguloMin[i];
     }
-    estado_boton=2;
+    estado_boton = 2;
     guardarPosiciones = true;
   }
-  
+
   // Lectura de las posiciones de los potenciómetros
   for (uint8_t i = 0; i < NUM_SERVOS; i++) {
     uint16_t lectura = analogRead(potPin[i]);
     uint8_t pos = map(lectura, 0, 1023, anguloMin[i], anguloMax[i]);
     servoPos[i] = pos;
   }
-/*
-  // Botón para guardar las posiciones en la EEPROM
-  uint8_t botonEstado = PIND & (1 << botonPin);
+
+  //Botón para guardar las posiciones en la EEPROM
+  uint8_t botonEstado = PIND & (1 << B);
   if (botonEstado == 0 && botonEstadoAnterior != 0) {
     guardarPosiciones = true;
   }
   botonEstadoAnterior = botonEstado;
-*/
+
   // Guardar las posiciones en la EEPROM
   if (guardarPosiciones) {
     for (uint8_t i = 0; i < NUM_SERVOS; i++) {
-    	servoPosGuardar[i]=servoPos[i];
+      servoPosGuardar[i] = servoPos[i];
     }
     for (uint8_t i = 0; i < NUM_SERVOS; i++) {
       eeprom_update_byte((uint8_t*)(i * sizeof(uint8_t)), servoPos[i]);  // Use sizeof(uint8_t) to ensure correct address increment
@@ -97,44 +98,51 @@ void loop() {
     }
     Serial.println("Posiciones guardadas en EEPROM");
     guardarPosiciones = false;
-    //digitalWrite(ledPin,LOW);
     eepromRecorded = true;  // Set the EEPROM recorded flag
   }
 
   // Enviar las posiciones de los servos por el puerto serial
   for (uint8_t i = 0; i < NUM_SERVOS; i++) {
-    
     Serial.write(servoPosEnviar[i]);
   }
-  digitalWrite(ledPin1,LOW);
+  digitalWrite(L1, LOW);
   _delay_ms(50);
 }
 
 // Timer 0 compare match interrupt handler
 ISR(TIMER0_COMPA_vect) {
   if (eepromRecorded) {
-    //digitalWrite(ledPin, HIGH);  // Turn on the LED
+    digitalWrite(L, HIGH);  // Turn on the LED
     eepromRecorded = false;      // Reset the EEPROM recorded flag
   } else {
-    //digitalWrite(ledPin, LOW);   // Turn off the LED
+    digitalWrite(L, LOW);   // Turn off the LED
   }
 }
 
-void Boton (){
-  if(estado_boton>1){
-    estado_boton=0;
+void Boton() {
+  if (estado_boton > 1) {
+    estado_boton = 0;
+  } else {
+    estado_boton = estado_boton + 1;
   }
-  else{
-    estado_boton=estado_boton+1;
-  }
-  
-  //digitalWrite(ledPin,HIGH);
 }
 
-void Boton1 (){
-  digitalWrite(ledPin1,HIGH);
+void Boton1() {
+  digitalWrite(L1, HIGH);
   for (uint8_t i = 0; i < NUM_SERVOS; i++) {
-    servoPosEnviar[i] = eeprom_read_byte((uint8_t*)(i * sizeof(uint8_t))); 
+    servoPosEnviar[i] = eeprom_read_byte((uint8_t*)(i * sizeof(uint8_t)));
   }
+
+  // Check for alarm conditions
+  if (servoPos[0] >= anguloMax[0] && servoPos[1] >= anguloMax[1] && servoPos[2] >= anguloMax[2] &&
+    servoPos[3] >= anguloMax[3] && servoPos[4] >= anguloMax[4] && servoPos[5] >= anguloMax[5]) {
+    Serial.write((byte)1); // Send an additional signal to indicate alarm condition
+  } else {
+    Serial.write((byte)0); // Send 0 if alarm conditions are not met
+  }
+
+  delay(50);
 }
+
+
 
