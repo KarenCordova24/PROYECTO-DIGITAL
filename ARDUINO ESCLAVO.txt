@@ -7,9 +7,23 @@
 #define NUM_SERVOS 6
 
 Servo servo[NUM_SERVOS];
+uint8_t servoPosEnviar[NUM_SERVOS];
+uint8_t servoPosGuardar[NUM_SERVOS];
 uint8_t servoPin[NUM_SERVOS] = {8, 9, 10, 11, 12, 13};
+uint8_t anguloMin[NUM_SERVOS] = {50, 10, 10, 10, 10, 10};    // Ángulo mínimo permitido
+uint8_t pos;
+uint8_t Counter=0;
+uint8_t Emergency=0;
 
-LiquidCrystal_I2C lcd(32,16, 2);  // Set the LCD I2C address and dimensions
+LiquidCrystal_I2C lcd(32, 16, 2);  // Set the LCD I2C address and dimensions
+
+int timer=0;
+const int alarmPin = 3; // Pin number for the alarm
+const int ledPin = 5;   // Pin number for the LED
+const int EmergencyReset = 2;
+bool alarmTriggered = false;
+
+const int LL=6; //Led timer por alarma
 
 void setup() {
   Serial.begin(9600);
@@ -22,31 +36,141 @@ void setup() {
   lcd.print("Calibrando...");
   delay(300);
   lcd.clear();
-
+  
+  TCCR0A=(1<<WGM01);    //Set the CTC mode   
+  OCR0A=0xF9; //Value for ORC0A for 1ms 
+  TIMSK0|=(1<<OCIE0A);   //Set  the interrupt request 
+  sei(); //Enable interrupt
+  TCCR0B|=(1<<CS01);    //Set the prescale 1/64 clock
+  TCCR0B|=(1<<CS00);
+  
+  
   for (uint8_t i = 0; i < NUM_SERVOS; i++) {
     servo[i].attach(servoPin[i]);
   }
+
+  pinMode(alarmPin, OUTPUT);
+  pinMode(EmergencyReset, INPUT_PULLUP);
+  pinMode(ledPin, OUTPUT);
+  pinMode(LL, OUTPUT);
+
+  attachInterrupt(0, alarmInterrupt, RISING);
+  
+
 }
 
 void loop() {
+  if(timer>=500){
+    Counter=1;
+    timer=0;
+  }
+
   if (Serial.available() >= NUM_SERVOS) {
-    lcd.clear();  // Clear the LCD display
-    lcd.setCursor(0, 0);  // Set the cursor to the first position
-    
     for (uint8_t i = 0; i < NUM_SERVOS; i++) {
-      uint8_t pos = Serial.read();
-      servo[i].write(pos);
-      
-      // Display servo positions on the LCD
-      lcd.print(" Servo ");
-      lcd.print(i);
-      lcd.print(": ");
-      lcd.print(pos);
-      lcd.print("   ");
+      servoPosGuardar[i] = Serial.read();
     }
   }
   
-  // Delay to allow time for the servos to move
-  _delay_ms(50);
+  if(Emergency){
+    digitalWrite(ledPin, HIGH);
+    for (uint8_t i = 0; i < NUM_SERVOS; i++) {
+      servoPosGuardar[i] = anguloMin[i];
+    }
+    for (uint8_t i = 0; i < NUM_SERVOS; i++) {
+      uint8_t pos = servoPosGuardar[i];
+      servo[i].write(pos);
+      lcd.setCursor(0, i);
+      lcd.print("Emergencia ");
+      lcd.print(i);
+      lcd.print(": ");
+      lcd.print(pos);
+      lcd.print("     ");
+    }
+    digitalWrite(alarmPin, HIGH); // Turn on the alarm
+    blinkLED();                   // Blink the LED
+    digitalWrite(alarmPin, LOW);  // Turn off the alarm
+  }
+  else{
+    digitalWrite(ledPin, LOW);
+
+    if (Counter==1) {
+      digitalWrite(LL, HIGH);  // Turn on the LED
+      for (uint8_t i = 0; i < NUM_SERVOS; i++) {
+        servoPosEnviar[i] = servoPosGuardar[i];
+      }
+      for (uint8_t i = 0; i < NUM_SERVOS; i++) {
+        uint8_t pos = servoPosEnviar[i];
+        servo[i].write(pos);
+        lcd.setCursor(0, i);
+        lcd.print("Servo ");
+        lcd.print(i);
+        lcd.print(": ");
+        lcd.print(pos);
+        lcd.print("     ");
+      }
+      Counter=0;
+    } else {
+      digitalWrite(LL, LOW);   // Turn off the LED
+    }
+  }
+
+
+
+
+  // Add the rest of your code here
+
+  // Check if alarm is triggered
+  if (alarmTriggered) {
+    activateAlarm();
+  }
 }
+
+ISR(TIMER0_COMPA_vect) {
+	timer++;
+}
+
+
+void activateAlarm() {
+  for (uint8_t i = 0; i < NUM_SERVOS; i++) {
+      servoPosGuardar[i] = anguloMin[i];
+  }
+  for (uint8_t i = 0; i < NUM_SERVOS; i++) {
+    uint8_t pos = servoPosGuardar[i];
+    servo[i].write(pos);
+    lcd.setCursor(0, i);
+    lcd.print("Emergencia ");
+    lcd.print(i);
+    lcd.print(": ");
+    lcd.print(pos);
+    lcd.print("     ");
+  }
+  digitalWrite(alarmPin, HIGH); // Turn on the alarm
+  blinkLED();                   // Blink the LED
+  digitalWrite(alarmPin, LOW);  // Turn off the alarm
+  alarmTriggered = false;       // Reset the alarm trigger flag
+  digitalWrite(ledPin, LOW);
+}
+
+void blinkLED() {
+  const int blinkDuration = 500; // Blink duration in milliseconds
+  const int blinkInterval = 250; // Blink interval in milliseconds
+  unsigned long previousMillis = 0;
+  static bool ledState = LOW;
+
+  unsigned long currentMillis = millis();
+  if (currentMillis - previousMillis >= blinkInterval) {
+    previousMillis = currentMillis;
+    ledState = !ledState;
+    digitalWrite(ledPin, ledState);
+  }
+
+  delay(blinkDuration);
+}
+
+void alarmInterrupt() {
+  // Handle interrupt if required
+  Emergency=!Emergency;
+  //alarmTriggered = true; // Set the alarm trigger flag
+}
+
 
