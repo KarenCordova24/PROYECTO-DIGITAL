@@ -15,120 +15,42 @@ uint8_t pos;
 uint8_t Counter=0;
 uint8_t Emergency=0;
 
-LiquidCrystal_I2C lcd(32, 16, 2);  // Set the LCD I2C address and dimensions
+LiquidCrystal_I2C lcd(0x27, 16, 2);  // Establecer la dirección y las dimensiones de LCD I2C
 
 int timer=0;
-const int alarmPin = 3; // Pin number for the alarm
-const int ledPin = 5;   // Pin number for the LED
-const int EmergencyReset = 2;
-bool alarmTriggered = false;
+const int alarmPin = 3; // Número de Pin para la alarma PD3
+const int ledPin = 5;   // Número de Pin para el LED PD5
+const int EmergencyReset = 2; // PD2
+bool alarmTriggered = false; 
 
 const int LL=6; //Led timer por alarma
 
-void setup() {
-  Serial.begin(9600);
-  lcd.init();  // Initialize the LCD
-  lcd.backlight();  // Turn on the backlight
-  lcd.setCursor(0, 0);
-  lcd.print("MANO ROBOTICA");
-  delay(500);
-  lcd.setCursor(0, 0);
-  lcd.print("Calibrando...");
-  delay(300);
-  lcd.clear();
-  
-  TCCR0A=(1<<WGM01);    //Set the CTC mode   
-  OCR0A=0xF9; //Value for ORC0A for 1ms 
-  TIMSK0|=(1<<OCIE0A);   //Set  the interrupt request 
-  sei(); //Enable interrupt
-  TCCR0B|=(1<<CS01);    //Set the prescale 1/64 clock
-  TCCR0B|=(1<<CS00);
-  
-  
-  for (uint8_t i = 0; i < NUM_SERVOS; i++) {
-    servo[i].attach(servoPin[i]);
-  }
-
-  pinMode(alarmPin, OUTPUT);
-  pinMode(EmergencyReset, INPUT_PULLUP);
-  pinMode(ledPin, OUTPUT);
-  pinMode(LL, OUTPUT);
-
-  attachInterrupt(0, alarmInterrupt, RISING);
-  
-
+void alarmInterrupt() {
+  // Manejar la interrupción si es necesario
+  Emergency=!Emergency;
+  //alarmTriggered = true; // Establecer el indicador de activación de alarma
 }
 
-void loop() {
-  if(timer>=500){
-    Counter=1;
-    timer=0;
-  }
+//El registro PORTD debe usarse para escribir en los pines y el registro DDRD debe usarse para configurar los modos de pin.
 
-  if (Serial.available() >= NUM_SERVOS) {
-    for (uint8_t i = 0; i < NUM_SERVOS; i++) {
-      servoPosGuardar[i] = Serial.read();
-    }
-  }
-  
-  if(Emergency){
-    digitalWrite(ledPin, HIGH);
-    for (uint8_t i = 0; i < NUM_SERVOS; i++) {
-      servoPosGuardar[i] = anguloMin[i];
-    }
-    for (uint8_t i = 0; i < NUM_SERVOS; i++) {
-      uint8_t pos = servoPosGuardar[i];
-      servo[i].write(pos);
-      lcd.setCursor(0, i);
-      lcd.print("Emergencia ");
-      lcd.print(i);
-      lcd.print(": ");
-      lcd.print(pos);
-      lcd.print("     ");
-    }
-    digitalWrite(alarmPin, HIGH); // Turn on the alarm
-    blinkLED();                   // Blink the LED
-    digitalWrite(alarmPin, LOW);  // Turn off the alarm
-  }
-  else{
-    digitalWrite(ledPin, LOW);
+void blinkLED() {
+  const int blinkDuration = 500; // Duración del Blink en milisegundos
+  const int blinkInterval = 250; // Intervalo del Blink en milisegundos
+  unsigned long previousMillis = 0;
+  static bool ledState = LOW;
 
-    if (Counter==1) {
-      digitalWrite(LL, HIGH);  // Turn on the LED
-      for (uint8_t i = 0; i < NUM_SERVOS; i++) {
-        servoPosEnviar[i] = servoPosGuardar[i];
-      }
-      for (uint8_t i = 0; i < NUM_SERVOS; i++) {
-        uint8_t pos = servoPosEnviar[i];
-        servo[i].write(pos);
-        lcd.setCursor(0, i);
-        lcd.print("Servo ");
-        lcd.print(i);
-        lcd.print(": ");
-        lcd.print(pos);
-        lcd.print("     ");
-      }
-      Counter=0;
+  unsigned long currentMillis = millis();
+  if (currentMillis - previousMillis >= blinkInterval) {
+    previousMillis = currentMillis;
+    ledState = !ledState;
+    if (ledState) {
+      PORTD |= (1 << PORTD5);   // ON LED
     } else {
-      digitalWrite(LL, LOW);   // Turn off the LED
+      PORTD &= ~(1 << PORTD5);  // OFF LED
     }
   }
-
-
-
-
-  // Add the rest of your code here
-
-  // Check if alarm is triggered
-  if (alarmTriggered) {
-    activateAlarm();
-  }
+  delay(blinkDuration);
 }
-
-ISR(TIMER0_COMPA_vect) {
-	timer++;
-}
-
 
 void activateAlarm() {
   for (uint8_t i = 0; i < NUM_SERVOS; i++) {
@@ -144,33 +66,108 @@ void activateAlarm() {
     lcd.print(pos);
     lcd.print("     ");
   }
-  digitalWrite(alarmPin, HIGH); // Turn on the alarm
-  blinkLED();                   // Blink the LED
-  digitalWrite(alarmPin, LOW);  // Turn off the alarm
-  alarmTriggered = false;       // Reset the alarm trigger flag
-  digitalWrite(ledPin, LOW);
+  PORTD |= (1 << PORTD3);    // ON alarma
+  blinkLED();                // Blink LED
+  PORTD &= ~(1 << PORTD3);   // OFF alarma
+  alarmTriggered = false;    // Restablecer el indicador de activación de alarma
+  PORTD &= ~(1 << PORTD5);   // OFF LED
 }
 
-void blinkLED() {
-  const int blinkDuration = 500; // Blink duration in milliseconds
-  const int blinkInterval = 250; // Blink interval in milliseconds
-  unsigned long previousMillis = 0;
-  static bool ledState = LOW;
+ISR(TIMER0_COMPA_vect) {
+	timer++;
+}
 
-  unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= blinkInterval) {
-    previousMillis = currentMillis;
-    ledState = !ledState;
-    digitalWrite(ledPin, ledState);
+void setup() {
+  Serial.begin(9600);
+  lcd.init();  // Inicializando la LCD
+  lcd.backlight();  // ON backlight
+  lcd.setCursor(0, 0);
+  lcd.print("MANO ROBOTICA");
+  delay(500);
+  lcd.setCursor(0, 0);
+  lcd.print("Calibrando...");
+  delay(300);
+  lcd.clear();
+  
+//Timer para mostrar que se alcanzó la posición inicial (ángulo min) de los servos mediante un led
+  TCCR0A=(1<<WGM01);    //Estableciendo el modo CTC   
+  OCR0A=0xF9; //Valor de ORC0A para 1ms 
+  TIMSK0|=(1<<OCIE0A);   // Establecer la solicitud de interrupción
+  sei(); //Habilitar interrupción
+  TCCR0B|=(1<<CS01);    //Establecer el reloj de preescala 1/64
+  TCCR0B|=(1<<CS00);
+  
+  for (uint8_t i = 0; i < NUM_SERVOS; i++) {
+    servo[i].attach(servoPin[i]);
   }
 
-  delay(blinkDuration);
+  DDRD |= (1 << PORTD3); // Estableciendo alarmPin como OUTPUT
+  DDRD |= (1 << PORTD5); // Estableciendo ledPin como OUTPUT
+  DDRD |= (1 << PORTD6); // Estableciendo LL como OUTPUT
+
+  attachInterrupt(0, alarmInterrupt, RISING);
 }
 
-void alarmInterrupt() {
-  // Handle interrupt if required
-  Emergency=!Emergency;
-  //alarmTriggered = true; // Set the alarm trigger flag
+void loop() {
+  if(timer>=500){
+    Counter=1;
+    timer=0;
+  }
+
+  if (Serial.available() >= NUM_SERVOS) {
+    for (uint8_t i = 0; i < NUM_SERVOS; i++) {
+      servoPosGuardar[i] = Serial.read();
+    }
+  }
+  
+if (Emergency) {
+  PORTD |= (1 << PORTD5); // Estableciendo ledPin HIGH
+  for (uint8_t i = 0; i < NUM_SERVOS; i++) {
+    servoPosGuardar[i] = anguloMin[i];
+  }
+    for (uint8_t i = 0; i < NUM_SERVOS; i++) {
+      uint8_t pos = servoPosGuardar[i];
+      servo[i].write(pos);
+      lcd.setCursor(0, i);
+      lcd.print("Emergencia ");
+      lcd.print(i);
+      lcd.print(": ");
+      lcd.print(pos);
+      lcd.print("     ");
+    }
+
+PORTD |= (1 << PORTD3);  // ON alarma
+blinkLED();                // Blink LED
+PORTD &= ~(1 << PORTD3); // OFF alarma
+}
+  else{
+PORTD &= ~(1 << PORTD5);  // OFF LED
+
+if (Counter == 1) {
+  PORTD |= (1 << PORTD6);  // ON LED
+  for (uint8_t i = 0; i < NUM_SERVOS; i++) {
+    servoPosEnviar[i] = servoPosGuardar[i];
+  }
+  for (uint8_t i = 0; i < NUM_SERVOS; i++) {
+    uint8_t pos = servoPosEnviar[i];
+    servo[i].write(pos);
+    lcd.setCursor(0, i);
+    lcd.print("Servo ");
+    lcd.print(i);
+    lcd.print(": ");
+    lcd.print(pos);
+    lcd.print("     ");
+  }
+  Counter = 0;
+} else {
+  PORTD &= ~(1 << PORTD6);  // OFF LED
+}
+
+  // Comprobar si se activa la alarma
+  if (alarmTriggered) {
+    activateAlarm();
+  }
+}
 }
 
 
