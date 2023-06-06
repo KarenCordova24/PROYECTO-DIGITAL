@@ -11,14 +11,18 @@
 uint8_t servoPos[NUM_SERVOS];
 uint8_t servoPosEnviar[NUM_SERVOS];
 uint8_t servoPosGuardar[NUM_SERVOS];
-uint8_t potPin[NUM_SERVOS] = {A0, A1, A2, A3, A4, A5};  // Use A0, A1, ... for analog input pins
+uint8_t potPin[NUM_SERVOS] = {A0, A1, A2, A3, A4, A5};  // Uso de A0, A1, ... para pines de entrada analógica
+uint8_t potPin2[NUM_SERVOS] = {0x00, 0x01, 0x02, 0x03, 0x04, 0x05};
 uint8_t B = 2;
-uint8_t botonPin = 3; // Define the button pin number
+uint8_t botonPin = 3; // Definiendo el número de PIN del botón
 uint8_t botonEstadoAnterior = 1;
 uint8_t estado_boton = 2;
 bool guardarPosiciones = false;
-volatile bool eepromRecorded = false;  // Volatile flag to indicate EEPROM recording
-const uint8_t L = 13;    // Pin for the LED
+volatile bool eepromRecorded = false;  // Indicador volátil para indicar la grabación de EEPROM. Al estar inicializado en falso varias partes del programa pueden acceder a ella y modificarla, como los ISR.
+//Se utiliza volatile para indicar que una variable puede ser modificada por una rutina de servicio de interrupción (ISR) 
+//o múltiples subprocesos en un programa de subprocesos múltiples. Como bien lo indica su nombre el compilador debe tener precauciones
+//adicionales para garantizar que cualquier cambio en la variable sea reflejado adecuadamente en el programa.
+const uint8_t L = 13;    // Pin para el LED
 const uint8_t L1 = 4;
 
 // Ángulos límites para cada servo
@@ -27,15 +31,22 @@ uint8_t anguloMax[NUM_SERVOS] = {170, 150, 150, 150, 150, 150};    // Ángulo m�
 
 void setup() {
   Serial.begin(9600);
-  DDRD &= ~(1 << B);  // Configurar el pin del botón como entrada
-  PORTD |= (1 << B);  // Habilitar resistencia pull-up interna en el pin del botón
-  pinMode(L, OUTPUT);   // Set the LED pin as output
-  pinMode(L1, OUTPUT);   // Set the LED pin as output
-  pinMode(botonPin, INPUT_PULLUP);
-  attachInterrupt(0, Boton, RISING);
+  ADCSRA &= ~(1 << ADEN);  // Desahabilitando el ADC
+  DDRD &= ~(1 << PD2);  // Configurando el pin del botón como entrada
+  PORTD |= (1 << PD2);  // Habilitando la resistencia pull-up interna en el pin del botón
+
+  // Configuración de los pines LED como salida/output utilizando los registros PORT y DDR
+  DDRB |= (1 << PB5); // Estableciendo el pin 13 (L) como output
+  DDRD |= (1 << PD4); // Estableciendo el pin 4 (L1) como output
+
+  // Estableciendo el pin del botón como entrada/input con resistencia pull-up interna usando registros PORT y DDR
+  DDRD &= ~(1 << PD3); // Estableciendo el pin 3 (botonPin) como input
+  PORTD |= (1 << PD3); // Habilitando la resistencia pull-up interna en el pin 3 (botonPin
+
+  attachInterrupt(0, Boton, RISING); 
   attachInterrupt(1, Boton1, RISING);
 
-  // Configurando el Timer 0 para el control LED TIEMPO REAL "Amarillo"
+  // Configurando el Timer 0 para el control del LED de grabación en "TIEMPO REAL"
   TCCR0A = 0;                   // Establecer los registros de control del temporizador en 0
   TCCR0B = 0;
   TCNT0 = 0;                    // Inicializando el valor del contador
@@ -48,7 +59,7 @@ void setup() {
 
   // Leer las posiciones guardadas en la EEPROM
   for (uint8_t i = 0; i < NUM_SERVOS; i++) {
-    servoPos[i] = eeprom_read_byte((uint8_t*)(i * sizeof(uint8_t)));  // Use sizeof(uint8_t) to ensure correct address increment
+    servoPos[i] = eeprom_read_byte((uint8_t*)(i * sizeof(uint8_t)));  // Utilizando sizeof(uint8_t) para garantizar el incremento de dirección correcto
     Serial.print("Servo ");
     Serial.print(i);
     Serial.print(" - Posición guardada: ");
@@ -59,13 +70,13 @@ void setup() {
 void loop() {
 
   if (estado_boton == 0) {
-    digitalWrite(L, HIGH);
+    PORTB |= (1 << PB5); // Estableciendo pin 13 (L) en HIGH
     for (uint8_t i = 0; i < NUM_SERVOS; i++) {
       servoPosEnviar[i] = servoPos[i];
     }
   }
   if (estado_boton == 1) {
-    digitalWrite(L, LOW);
+    PORTB &= ~(1 << PB5); // Estableciendo pin 13 (L) en low
     for (uint8_t i = 0; i < NUM_SERVOS; i++) {
       servoPosEnviar[i] = anguloMin[i];
     }
@@ -75,13 +86,20 @@ void loop() {
 
   // Lectura de las posiciones de los potenciómetros
   for (uint8_t i = 0; i < NUM_SERVOS; i++) {
-    uint16_t lectura = analogRead(potPin[i]);
+    ADCSRA |= (1 << ADEN);  // Habilitar ADC
+    ADMUX |= B11000000;
+    ADMUX |= (potPin2[i]);
+    //ADMUX = (ADMUX & 0xC0) | (potPin2[i]);  // Selección del canal ADC
+    ADCSRA |= (1 << ADSC);  // Inicio de conversión ADC
+    while (ADCSRA & (1 << ADSC));  // Espera a que se complete la conversión
+    uint16_t lectura = (ADCL|(ADCH<<8));  // Lectura del valor ADC
     uint8_t pos = map(lectura, 0, 1023, anguloMin[i], anguloMax[i]);
     servoPos[i] = pos;
+    ADCSRA &= ~(1 << ADEN);  // Deshabilitar ADC
   }
 
   //Botón para guardar las posiciones en la EEPROM
-  uint8_t botonEstado = PIND & (1 << B);
+  uint8_t botonEstado = PIND & (1 << PD2);
   if (botonEstado == 0 && botonEstadoAnterior != 0) {
     guardarPosiciones = true;
   }
@@ -93,29 +111,29 @@ void loop() {
       servoPosGuardar[i] = servoPos[i];
     }
     for (uint8_t i = 0; i < NUM_SERVOS; i++) {
-      eeprom_update_byte((uint8_t*)(i * sizeof(uint8_t)), servoPos[i]);  // Use sizeof(uint8_t) to ensure correct address increment
+      eeprom_update_byte((uint8_t*)(i * sizeof(uint8_t)), servoPos[i]);  // Uso de sizeof(uint8_t) para garantizar el incremento de dirección correcto
       _delay_ms(10);
     }
     Serial.println("Posiciones guardadas en EEPROM");
     guardarPosiciones = false;
-    eepromRecorded = true;  // Set the EEPROM recorded flag
+    eepromRecorded = true;  // Estableciendo el indicador de grabación de EEPROM
   }
 
-  // Enviar las posiciones de los servos por el puerto serial
+    // Enviar las posiciones de los servos por el puerto serial
   for (uint8_t i = 0; i < NUM_SERVOS; i++) {
     Serial.write(servoPosEnviar[i]);
   }
-  digitalWrite(L1, LOW);
+  PORTD &= ~(1 << PD4); // Estableciendo pin 4 (L1) como low
   _delay_ms(50);
 }
 
-// Timer 0 compare match interrupt handler
+// Timer 0 para comparar el controlador de interrupción de coincidencia
 ISR(TIMER0_COMPA_vect) {
   if (eepromRecorded) {
-    digitalWrite(L, HIGH);  // Turn on the LED
-    eepromRecorded = false;      // Reset the EEPROM recorded flag
+    PORTB |= (1 << PB5); // ON LED (pin L)
+    eepromRecorded = false; // Restablecer el indicador grabado de EEPROM
   } else {
-    digitalWrite(L, LOW);   // Turn off the LED
+    PORTB &= ~(1 << PB5); // OFF LED (pin L)
   }
 }
 
@@ -126,23 +144,24 @@ void Boton() {
     estado_boton = estado_boton + 1;
   }
 }
+//El propósito de esta función es alternar el valor de estado_boton entre 0 y 1. Si el valor actual de estado_boton es 0 o 1, 
+//se incrementará en 1 para alternar su estado. Si el valor actual de estado_boton es mayor que 1, se pondrá a 0 para restablecer
+//su estado. Se usa comúnmente en escenarios donde se está monitoreando un botón, y cada vez que se presiona el botón, el estado cambia entre dos valores.
 
 void Boton1() {
-  digitalWrite(L1, HIGH);
+  PORTD |= (1 << PD4); // Estableciendo pin 4 (L1) como HIGH
   for (uint8_t i = 0; i < NUM_SERVOS; i++) {
     servoPosEnviar[i] = eeprom_read_byte((uint8_t*)(i * sizeof(uint8_t)));
   }
 
-  // Check for alarm conditions
+  // Comprobración de las condiciones de alarma
   if (servoPos[0] >= anguloMax[0] && servoPos[1] >= anguloMax[1] && servoPos[2] >= anguloMax[2] &&
     servoPos[3] >= anguloMax[3] && servoPos[4] >= anguloMax[4] && servoPos[5] >= anguloMax[5]) {
-    Serial.write((byte)1); // Send an additional signal to indicate alarm condition
+    Serial.write((byte)1); // Envía una señal adicional para indicar la condición de alarma
   } else {
-    Serial.write((byte)0); // Send 0 if alarm conditions are not met
+    Serial.write((byte)0); // Enviar 0 si no se cumplen las condiciones de alarma
   }
-
   delay(50);
 }
-
 
 
